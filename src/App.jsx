@@ -29,12 +29,15 @@ export default function App() {
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '', role: 'CUSTOMER' });
   const [role, setRole] = useState(localStorage.getItem('role') || '');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false); // for login/register
+  const [loadingEndpoint, setLoadingEndpoint] = useState(null); // for per-button
 
   useEffect(() => {
     if (localStorage.getItem('token')) setPage('dashboard');
   }, []);
 
   const login = async () => {
+    setLoading(true);
     try {
       const res = await api.post('/auth/login', loginData);
       localStorage.setItem('token', res.data.token);
@@ -44,16 +47,21 @@ export default function App() {
       setMessage('Login success');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async () => {
+    setLoading(true);
     try {
       const res = await api.post('/auth/register', registerData);
       setMessage(res.data.message || 'Register success');
       setPage('login');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Register failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,13 +73,22 @@ export default function App() {
   };
 
   const callEndpoint = async (path) => {
+    setLoadingEndpoint(path);
     try {
       const res = await api.get(path);
       setMessage(res.data);
     } catch (err) {
       setMessage(err.response?.data?.message || 'Request failed');
+    } finally {
+      setLoadingEndpoint(null);
     }
   };
+
+  const Spinner = () => (
+      <div className="flex justify-center items-center">
+        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      </div>
+  );
 
   if (page === 'login') {
     return (
@@ -89,8 +106,12 @@ export default function App() {
                 placeholder="Password"
                 onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
             />
-            <button onClick={login} className="w-full bg-blue-500 text-white p-2 rounded">
-              Login
+            <button
+                onClick={login}
+                disabled={loading}
+                className="w-full bg-blue-500 text-white p-2 rounded flex justify-center"
+            >
+              {loading ? <Spinner /> : 'Login'}
             </button>
             <button onClick={() => setPage('register')} className="w-full text-blue-500">
               Go Register
@@ -130,8 +151,12 @@ export default function App() {
               <option>EMPLOYEE</option>
               <option>TENANT</option>
             </select>
-            <button onClick={register} className="w-full bg-green-500 text-white p-2 rounded">
-              Register
+            <button
+                onClick={register}
+                disabled={loading}
+                className="w-full bg-green-500 text-white p-2 rounded flex justify-center"
+            >
+              {loading ? <Spinner /> : 'Register'}
             </button>
             <button onClick={() => setPage('login')} className="w-full text-blue-500">
               Go Login
@@ -160,15 +185,26 @@ export default function App() {
           <div className="grid md:grid-cols-2 gap-4">
             {endpointConfig.map((ep) => {
               const hasAccess = ep.roles.includes(role);
+              const isLoading = loadingEndpoint === ep.path;
+
               return (
                   <button
                       key={ep.path}
                       onClick={() => callEndpoint(ep.path)}
-                      className={`p-4 rounded text-white ${hasAccess ? 'bg-green-500' : 'bg-red-500'}`}
+                      disabled={isLoading}
+                      className={`p-4 rounded text-white flex justify-center items-center ${
+                          hasAccess ? 'bg-green-500' : 'bg-red-500'
+                      }`}
                   >
-                    <div className="font-bold">{ep.name}</div>
-                    <div className="text-sm">{ep.path}</div>
-                    <div className="text-xs mt-1">Access: {ep.roles.join(', ')}</div>
+                    {isLoading ? (
+                        <Spinner />
+                    ) : (
+                        <div>
+                          <div className="font-bold">{ep.name}</div>
+                          <div className="text-sm">{ep.path}</div>
+                          <div className="text-xs mt-1">Access: {ep.roles.join(', ')}</div>
+                        </div>
+                    )}
                   </button>
               );
             })}
